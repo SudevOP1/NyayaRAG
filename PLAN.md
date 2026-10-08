@@ -17,7 +17,7 @@ Update this table at the end of every phase (see `CLAUDE.md`). Details of each p
 
 | Phase | Name | Status | Resume claims it unlocks | Done on |
 |---|---|---|---|---|
-| P1 | Foundation: repo, data, parser, chunker, mapper | ⬜ Not started | "all 1,059 sections", "section-aware chunking", "IPC-to-BNS mapper" | |
+| P1 | Foundation: repo, data, parser, chunker, mapper | 🟨 In progress (built; 🧑 verdicts + mapper hand-check pending) | "all 1,059 sections", "section-aware chunking", "IPC-to-BNS mapper" | |
 | P2 | Golden set, eval harness, BM25 + dense baselines (Qdrant) | ⬜ Not started | "hand-verified 130-question test set", "0.62 (BM25)" | |
 | P3 | Embedding fine-tune, hybrid RRF, reranker, ablations (MLflow) | ⬜ Not started | "Recall@5 … to 0.85", "fine-tuning bge-small in PyTorch on 3,000+ pairs", "cross-encoder reranker", "MLflow-tracked" | |
 | P4 | Generation, citation validator, answerability gate, LangGraph agent, RAGAS | ⬜ Not started | "0.90+ RAGAS faithfulness", "refused 90%+", "LangGraph tool-calling agent", "scikit-learn answerability classifier" | |
@@ -126,6 +126,8 @@ All checked on 2026-10-07. Re-check the links at the start of P1.
 | IPC-to-BNS correspondence table | "Correspondence Table and Comparison Summary of the BNS, 2023 to the IPC, 1860", CAPT Bhopal (confirm affiliation on https://bprd.nic.in/page/training before writing it in the README) | https://www.keralaprisons.gov.in/userfiles/act-and-rules/comparison_summary_BNS_to_IPC.pdf ; BNSS↔CrPC: https://keralaprisons.gov.in/userfiles/act-and-rules/comparison_summary_BNSS_to_CrPC.pdf |
 | Second government copy | UP Police "BNS_IPC_Comparative" (same layout as Kaggle #5) | https://uppolice.gov.in/site/writereaddata/siteContent/Three%20New%20Major%20Acts/202406281710564823BNS_IPC_Comparative.pdf |
 | Cross-check source | NCRB "Sankalan of Criminal Laws" app (13 June 2024) | https://www.newsonair.gov.in/ncrb-launches-mobile-app-ncrb-sankalan-of-criminal-laws-new-criminal-laws-to-come-into-force-from-july-1 |
+
+**Download note (2026-10-08).** India Code bitstream links fail for scripts and browsers; `download.py` fetches the Gazette copies hosted by MHA (`mha.gov.in/sites/default/files/250883_english_01042024.pdf` BNS, `250884_2_english_01042024.pdf` BNSS, `250882_english_01042024.pdf` BSA). See `DECISIONS.md`.
 
 **Honesty note for the README.** The correspondence table is a government-academy reference document, not a statutory schedule. Call it "a government-published correspondence table", hand-check a sample against NCRB Sankalan, and never call it "the official mapping".
 

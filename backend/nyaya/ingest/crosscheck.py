@@ -1,0 +1,180 @@
+"""Cross-check the PDF parser against the Kaggle transcriptions (PLAN.md P1 "Cross-check").
+
+Titles are compared with `rapidfuzz.fuzz.token_set_ratio`, bodies (BNS, BSA) with `fuzz.ratio`
+on normalised text. Sections scoring below `THRESHOLD` on either go to
+`data/golden/DATA_QUALITY.md`, where the developer records a verdict: *my parser wrong*,
+*Kaggle wrong* or *formatting only*. Verdicts and notes survive regeneration. A *my parser wrong*
+row counts as resolved once its note starts with "fixed" or "patched".
+
+BNSS is checked on titles only: the Kaggle BNSS JSON (#4) is not a clean body transcription.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from pathlib import Path
+
+from rapidfuzz import fuzz
+
+from nyaya.config import DATA_QUALITY_PATH, KAGGLE_DIR, KAGGLE_SECTIONS_PATH, SECTIONS_PATH
+from nyaya.ingest.schema import Section, read_jsonl
+from nyaya.ingest.text import normalise_text
+
+THRESHOLD = 90.0
+VERDICTS = ("my parser wrong", "Kaggle wrong", "formatting only")
+Reference = dict[tuple[str, int], tuple[str, str]]  # (act, n) -> (title, body); body "" = n/a
+
+
+def normalise_for_compare(text: str) -> str:
+    t = text.lower().replace("’", "'").replace("‘", "'")
+    t = re.sub(r"[^a-z0-9]+", " ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def load_reference(
+    kaggle_sections: Path = KAGGLE_SECTIONS_PATH, kaggle_dir: Path = KAGGLE_DIR
+) -> tuple[Reference, set[str]]:
+    """BNS/BSA from the Kaggle CSVs (via `load_kaggle`), BNSS titles from the #4 JSON."""
+    ref: Reference = {}
+    for s in read_jsonl(kaggle_sections, Section):
+        ref[(s.act, s.section)] = (s.title, s.text)
+    title_only: set[str] = set()
+    bnss = sorted((kaggle_dir / "bnss_tanujsaxena").rglob("*.json"))
+    if bnss:
+        title_only.add("BNSS")
+        for row in json.loads(bnss[0].read_text(encoding="utf-8")):
+            num = str(row.get("section_no", "")).strip()
+            if num.isdigit():
+                ref.setdefault(("BNSS", int(num)), (normalise_text(row.get("title", "")), ""))
+    return ref, title_only
+
+
+def compare(ours: list[Section], ref: Reference, title_only: set[str] | None = None) -> list[dict]:
+    title_only = title_only or set()
+    rows = []
+    for s in ours:
+        their_title, their_body = ref.get((s.act, s.section), ("", ""))
+        t_score = (
+            round(
+                fuzz.token_set_ratio(
+                    normalise_for_compare(s.title), normalise_for_compare(their_title)
+                ),
+                1,
+            )
+            if their_title
+            else None
+        )
+        b_score = None
+        if s.act not in title_only and their_body:
+            b_score = round(
+                fuzz.ratio(normalise_for_compare(s.text), normalise_for_compare(their_body)), 1
+            )
+        hint = ""
+        if (s.act, s.section) not in ref:
+            hint = "no reference row"
+        elif s.act not in title_only and not their_body:
+            hint = "reference body empty"
+        elif b_score is not None and b_score < THRESHOLD:
+            ratio = len(s.text) / max(1, len(their_body))
+            hint = f"length ours/ref = {ratio:.2f}"
+        flagged = (
+            t_score is None
+            or t_score < THRESHOLD
+            or (s.act not in title_only and (b_score is None or b_score < THRESHOLD))
+        )
+        rows.append(
+            {
+                "act": s.act,
+                "section": s.section,
+                "title": s.title,
+                "title_score": t_score,
+                "body_score": b_score,
+                "flagged": flagged,
+                "hint": hint,
+            }
+        )
+    return rows
+
+
+_ROW_RE = re.compile(r"^\|\s*(BNS|BNSS|BSA) (\d+)\s*\|")
+
+
+def read_verdicts(path: Path) -> dict[tuple[str, int], tuple[str, str]]:
+    out: dict[tuple[str, int], tuple[str, str]] = {}
+    if not path.exists():
+        return out
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = _ROW_RE.match(line)
+        if not m:
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 7:
+            out[(m.group(1), int(m.group(2)))] = (cells[5], cells[6])
+    return out
+
+
+def _fmt(v: float | None) -> str:
+    return "n/a" if v is None else f"{v:.1f}"
+
+
+def render_report(rows: list[dict], verdicts: dict[tuple[str, int], tuple[str, str]]) -> str:
+    flagged = [r for r in rows if r["flagged"]]
+    by_act: dict[str, list[int]] = {}
+    for r in rows:
+        tot = by_act.setdefault(r["act"], [0, 0])
+        tot[0] += 1
+        tot[1] += r["flagged"]
+    counts = {v: 0 for v in (*VERDICTS, "")}
+    for r in flagged:
+        v = verdicts.get((r["act"], r["section"]), ("", ""))[0]
+        counts[v if v in counts else ""] += 1
+    out = [
+        "# Data quality: PDF parser vs Kaggle",
+        "",
+        "Generated by `uv run python -m nyaya.ingest.crosscheck`. Regenerating keeps the",
+        "Verdict and Notes columns. Verdicts (developer): `my parser wrong` (note must start",
+        "with `fixed` or",
+        "`patched` once resolved), `Kaggle wrong`, `formatting only`.",
+        "",
+        f"Threshold: {THRESHOLD:.0f} (titles: `token_set_ratio`; bodies: `ratio` on normalised "
+        "text; BNSS titles only).",
+        "",
+        "| Act | Sections | Flagged |",
+        "|---|---|---|",
+        *[f"| {a} | {n} | {f} |" for a, (n, f) in by_act.items()],
+        "",
+        "Verdict counts: " + ", ".join(f"{k or 'pending'}: {v}" for k, v in counts.items()),
+        "",
+        "| Section | Title (ours) | Title score | Body score | Hint | Verdict | Notes |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for r in flagged:
+        v, note = verdicts.get((r["act"], r["section"]), ("", ""))
+        title = r["title"].replace("|", "/")
+        out.append(
+            f"| {r['act']} {r['section']} | {title} | {_fmt(r['title_score'])} | "
+            f"{_fmt(r['body_score'])} | {r['hint']} | {v} | {note} |"
+        )
+    return "\n".join(out) + "\n"
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--out", default=str(DATA_QUALITY_PATH))
+    args = ap.parse_args(argv)
+    ours = list(read_jsonl(SECTIONS_PATH, Section))
+    ref, title_only = load_reference()
+    rows = compare(ours, ref, title_only)
+    out = Path(args.out)
+    report = render_report(rows, read_verdicts(out))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(report, encoding="utf-8")
+    flagged = sum(r["flagged"] for r in rows)
+    print(f"{flagged}/{len(rows)} sections below {THRESHOLD:.0f} -> {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

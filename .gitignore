@@ -1,0 +1,41 @@
+# Secrets
+.env
+kaggle.json
+*.pem
+
+# Data (licences: see PLAN.md §0.3)
+backend/data/raw/
+backend/data/external/*.jsonl
+backend/data/processed/*.jsonl
+backend/data/processed/*.json
+!backend/data/processed/.gitkeep
+backend/data/synthetic/*.jsonl
+
+# ML artefacts
+mlruns/
+backend/mlruns/
+*.safetensors
+*.gguf
+.cache/
+hf_cache/
+models/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+web/dist/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

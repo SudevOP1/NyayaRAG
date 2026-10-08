@@ -1,0 +1,10 @@
+# Explanatory notes attached to ipc_to_bns() answers. Reviewed by hand; each note needs a reason.
+- ipc: "124A"
+  note: >-
+    IPC 124A (sedition) was not re-enacted. BNS 152 (act endangering sovereignty, unity and
+    integrity of India) is the closest provision, not a re-enactment: its wording and ingredients
+    differ.
+  reason: >-
+    The correspondence table marks IPC 124A as Deleted and BNS 152 as a New Section, so the
+    mapper reports no direct equivalent; this note names the closest provision, as widely reported.
+  checked_against: UP Police BNS_IPC_Comparative PDF p.9 (data/raw/gov/)

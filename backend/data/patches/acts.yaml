@@ -1,0 +1,13 @@
+# Reviewed fixes for the Act parser (nyaya/ingest/parse_acts.py). Each entry needs a reason and
+# what it was checked against. Fields: act, section, [subsection], field, value, reason,
+# checked_against.
+- act: BNS
+  section: 106
+  subsection: "2"
+  field: in_force
+  value: false
+  reason: >-
+    The three laws came into force on 1 July 2024 except BNS s.106(2) (hit-and-run), which the
+    commencement notification of 24 Feb 2024 left out.
+  checked_against: >-
+    https://www.business-standard.com/india-news/three-laws-replacing-ipc-crpc-evidence-act-to-be-effective-from-july-1-124022400420_1.html
